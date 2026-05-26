@@ -28,10 +28,10 @@ public class MockHttpRequest implements InterceptedRequest {
     private final String pathWithoutQuery;
     private final String fileExtension;
     private final ContentType contentType;
+    private final List<ParsedHttpParameter> parameters;
     private final List<HttpHeader> headers;
     private final int bodyOffset;
-    private final ByteArray body;
-    private final String bodyToString;
+    private final String body;
     private final List<Marker> markers;
     private final int messageId;
     private final String listenerInterface;
@@ -39,7 +39,7 @@ public class MockHttpRequest implements InterceptedRequest {
     private final InetAddress destinationIpAddress;
 
     public MockHttpRequest() {
-        this(null, false, null, null, null, null, null, null, null, null, null, 0, null, null, null, 0, null, null, null);
+        this(null, false, null, null, null, null, null, null, null, null, null, null, 0, null, null, 0, null, null, null);
     }
 
     public MockHttpRequest(
@@ -53,10 +53,10 @@ public class MockHttpRequest implements InterceptedRequest {
             String pathWithoutQuery,
             String fileExtension,
             ContentType contentType,
+            List<ParsedHttpParameter> parameters,
             List<HttpHeader> headers,
             int bodyOffset,
-            ByteArray body,
-            String bodyToString,
+            String body,
             List<Marker> markers,
             int messageId,
             String listenerInterface,
@@ -73,10 +73,10 @@ public class MockHttpRequest implements InterceptedRequest {
         this.pathWithoutQuery = pathWithoutQuery;
         this.fileExtension = fileExtension;
         this.contentType = contentType;
+        this.parameters = parameters;
         this.headers = headers;
         this.bodyOffset = bodyOffset;
         this.body = body;
-        this.bodyToString = bodyToString;
         this.markers = markers;
         this.messageId = messageId;
         this.listenerInterface = listenerInterface;
@@ -136,77 +136,124 @@ public class MockHttpRequest implements InterceptedRequest {
 
     @Override
     public List<ParsedHttpParameter> parameters() {
-        return null;
+        return parameters;
     }
 
     @Override
     public List<ParsedHttpParameter> parameters(HttpParameterType type) {
-        return null;
+        if (parameters == null) {
+            return null;
+        }
+
+        return parameters.stream()
+                .filter(parameter -> parameter.type() == type)
+                .toList();
     }
 
     @Override
     public boolean hasParameters() {
-        return false;
+        return parameters != null && !parameters.isEmpty();
     }
 
     @Override
     public boolean hasParameters(HttpParameterType type) {
-        return false;
+        return parameters != null && parameters.stream().anyMatch(parameter -> parameter.type() == type);
     }
 
     @Override
     public ParsedHttpParameter parameter(String name, HttpParameterType type) {
-        return null;
+        if (parameters == null) {
+            return null;
+        }
+
+        return parameters.stream()
+                .filter(parameter -> name.equals(parameter.name()) && type == parameter.type())
+                .findFirst()
+                .orElse(null);
     }
 
     @Override
     public String parameterValue(String name, HttpParameterType type) {
-        return null;
+        ParsedHttpParameter parameter = parameter(name, type);
+        return parameter == null ? null : parameter.value();
     }
 
     @Override
     public ParsedHttpParameter parameter(String name) {
-        return null;
+        if (parameters == null) {
+            return null;
+        }
+
+        return parameters.stream()
+                .filter(parameter -> name.equals(parameter.name()))
+                .findFirst()
+                .orElse(null);
     }
 
     @Override
     public String parameterValue(String name) {
-        return null;
+        ParsedHttpParameter parameter = parameter(name);
+        return parameter == null ? null : parameter.value();
     }
 
     @Override
     public boolean hasParameter(String name, HttpParameterType type) {
-        return false;
+        return parameter(name, type) != null;
     }
 
     @Override
     public boolean hasParameter(HttpParameter parameter) {
-        return false;
+        if (parameters == null || parameter == null) {
+            return false;
+        }
+
+        return parameters.stream().anyMatch(existing ->
+                existing.type() == parameter.type()
+                        && existing.name().equals(parameter.name())
+                        && existing.value().equals(parameter.value()));
     }
 
     @Override
     public boolean hasHeader(HttpHeader header) {
-        return false;
+        if (headers == null || header == null) {
+            return false;
+        }
+
+        return headers.stream().anyMatch(existing ->
+                existing.name().equals(header.name()) && existing.value().equals(header.value()));
     }
 
     @Override
     public boolean hasHeader(String name) {
-        return false;
+        return header(name) != null;
     }
 
     @Override
     public boolean hasHeader(String name, String value) {
-        return false;
+        if (headers == null) {
+            return false;
+        }
+
+        return headers.stream().anyMatch(header ->
+                name.equals(header.name()) && value.equals(header.value()));
     }
 
     @Override
     public HttpHeader header(String name) {
-        return null;
+        if (headers == null) {
+            return null;
+        }
+
+        return headers.stream()
+                .filter(header -> name.equals(header.name()))
+                .findFirst()
+                .orElse(null);
     }
 
     @Override
     public String headerValue(String name) {
-        return null;
+        HttpHeader header = header(name);
+        return header == null ? null : header.value();
     }
 
     @Override
@@ -226,12 +273,12 @@ public class MockHttpRequest implements InterceptedRequest {
 
     @Override
     public ByteArray body() {
-        return body;
+        return null;
     }
 
     @Override
     public String bodyToString() {
-        return bodyToString;
+        return body;
     }
 
     @Override

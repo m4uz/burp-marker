@@ -6,8 +6,12 @@ import burp.api.montoya.core.Marker;
 import burp.api.montoya.http.HttpService;
 import burp.api.montoya.http.message.ContentType;
 import burp.api.montoya.http.message.HttpHeader;
+import burp.api.montoya.http.message.params.HttpParameter;
+import burp.api.montoya.http.message.params.HttpParameterType;
+import burp.api.montoya.http.message.params.ParsedHttpParameter;
 
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class MockBuilder {
@@ -20,6 +24,10 @@ public final class MockBuilder {
 
     public static HttpHeaderBuilder httpHeader() {
         return new HttpHeaderBuilder();
+    }
+
+    public static HttpParameterBuilder httpParameter() {
+        return new HttpParameterBuilder();
     }
 
     public static InterceptedRequestBuilder interceptedRequest() {
@@ -76,6 +84,31 @@ public final class MockBuilder {
         }
     }
 
+    public static final class HttpParameterBuilder {
+        private String name;
+        private String value;
+        private HttpParameterType type;
+
+        public HttpParameterBuilder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public HttpParameterBuilder value(String value) {
+            this.value = value;
+            return this;
+        }
+
+        public HttpParameterBuilder type(HttpParameterType type) {
+            this.type = type;
+            return this;
+        }
+
+        public MockHttpParameter build() {
+            return new MockHttpParameter(name, value, type);
+        }
+    }
+
     public static final class InterceptedRequestBuilder {
         private Annotations annotations;
         private boolean inScope;
@@ -87,9 +120,10 @@ public final class MockBuilder {
         private String pathWithoutQuery;
         private String fileExtension;
         private ContentType contentType;
-        private List<HttpHeader> headers;
+        private final List<ParsedHttpParameter> parameters = new ArrayList<>();
+        private final List<HttpHeader> headers = new ArrayList<>();
         private int bodyOffset;
-        private ByteArray body;
+        private String body;
         private String bodyToString;
         private List<Marker> markers;
         private int messageId;
@@ -147,8 +181,35 @@ public final class MockBuilder {
             return this;
         }
 
+        public InterceptedRequestBuilder httpParameter(HttpParameter parameter) {
+            if (parameter instanceof ParsedHttpParameter parsedParameter) {
+                this.parameters.add(parsedParameter);
+            } else {
+                this.parameters.add(new MockHttpParameter(parameter.name(), parameter.value(), parameter.type()));
+            }
+            return this;
+        }
+
+        public InterceptedRequestBuilder httpParameters(List<? extends HttpParameter> parameters) {
+            for (HttpParameter parameter : parameters) {
+                httpParameter(parameter);
+            }
+            return this;
+        }
+
+        public InterceptedRequestBuilder httpHeader(HttpHeader header) {
+            this.headers.add(header);
+            return this;
+        }
+
+        public InterceptedRequestBuilder httpHeaders(List<? extends HttpHeader> headers) {
+            this.headers.addAll(headers);
+            return this;
+        }
+
         public InterceptedRequestBuilder headers(List<HttpHeader> headers) {
-            this.headers = headers;
+            this.headers.clear();
+            this.headers.addAll(headers);
             return this;
         }
 
@@ -157,7 +218,7 @@ public final class MockBuilder {
             return this;
         }
 
-        public InterceptedRequestBuilder body(ByteArray body) {
+        public InterceptedRequestBuilder body(String body) {
             this.body = body;
             return this;
         }
@@ -204,10 +265,10 @@ public final class MockBuilder {
                     pathWithoutQuery,
                     fileExtension,
                     contentType,
-                    headers,
+                    parameters.isEmpty() ? null : List.copyOf(parameters),
+                    headers.isEmpty() ? null : List.copyOf(headers),
                     bodyOffset,
                     body,
-                    bodyToString,
                     markers,
                     messageId,
                     listenerInterface,
