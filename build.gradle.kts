@@ -2,7 +2,7 @@ plugins {
     id("java")
 }
 
-group = "m4uz"
+group = "marker"
 version = "0.0-SNAPSHOT"
 
 repositories {
