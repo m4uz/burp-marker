@@ -4,15 +4,20 @@ import burp.api.montoya.core.Annotations;
 import burp.api.montoya.core.ByteArray;
 import burp.api.montoya.core.Marker;
 import burp.api.montoya.http.HttpService;
+import burp.api.montoya.http.message.Cookie;
 import burp.api.montoya.http.message.ContentType;
 import burp.api.montoya.http.message.HttpHeader;
+import burp.api.montoya.http.message.MimeType;
 import burp.api.montoya.http.message.params.HttpParameter;
 import burp.api.montoya.http.message.params.HttpParameterType;
 import burp.api.montoya.http.message.params.ParsedHttpParameter;
+import burp.api.montoya.http.message.requests.HttpRequest;
 
 import java.net.InetAddress;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public final class MockBuilder {
     private MockBuilder() {
@@ -30,8 +35,16 @@ public final class MockBuilder {
         return new HttpParameterBuilder();
     }
 
+    public static CookieBuilder cookie() {
+        return new CookieBuilder();
+    }
+
     public static InterceptedRequestBuilder interceptedRequest() {
         return new InterceptedRequestBuilder();
+    }
+
+    public static InterceptedResponseBuilder interceptedResponse() {
+        return new InterceptedResponseBuilder();
     }
 
     public static final class HttpServiceBuilder {
@@ -106,6 +119,43 @@ public final class MockBuilder {
 
         public MockHttpParameter build() {
             return new MockHttpParameter(name, value, type);
+        }
+    }
+
+    public static final class CookieBuilder {
+        private String name;
+        private String value;
+        private String domain;
+        private String path;
+        private Optional<ZonedDateTime> expiration = Optional.empty();
+
+        public CookieBuilder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public CookieBuilder value(String value) {
+            this.value = value;
+            return this;
+        }
+
+        public CookieBuilder domain(String domain) {
+            this.domain = domain;
+            return this;
+        }
+
+        public CookieBuilder path(String path) {
+            this.path = path;
+            return this;
+        }
+
+        public CookieBuilder expiration(ZonedDateTime expiration) {
+            this.expiration = Optional.ofNullable(expiration);
+            return this;
+        }
+
+        public MockCookie build() {
+            return new MockCookie(name, value, domain, path, expiration);
         }
     }
 
@@ -270,6 +320,167 @@ public final class MockBuilder {
                     bodyOffset,
                     body,
                     markers,
+                    messageId,
+                    listenerInterface,
+                    sourceIpAddress,
+                    destinationIpAddress
+            );
+        }
+    }
+
+    public static final class InterceptedResponseBuilder {
+        private HttpRequest request;
+        private Annotations annotations;
+        private short statusCode;
+        private String reasonPhrase;
+        private String httpVersion;
+        private final List<HttpHeader> headers = new ArrayList<>();
+        private int bodyOffset;
+        private String body;
+        private List<Marker> markers;
+        private final List<Cookie> cookies = new ArrayList<>();
+        private MimeType mimeType;
+        private MimeType statedMimeType;
+        private MimeType inferredMimeType;
+        private String pageTitle;
+        private int messageId;
+        private String listenerInterface;
+        private InetAddress sourceIpAddress;
+        private InetAddress destinationIpAddress;
+
+        public InterceptedResponseBuilder request(HttpRequest request) {
+            this.request = request;
+            return this;
+        }
+
+        public InterceptedResponseBuilder initiatingRequest(HttpRequest request) {
+            this.request = request;
+            return this;
+        }
+
+        public InterceptedResponseBuilder annotations(Annotations annotations) {
+            this.annotations = annotations;
+            return this;
+        }
+
+        public InterceptedResponseBuilder statusCode(short statusCode) {
+            this.statusCode = statusCode;
+            return this;
+        }
+
+        public InterceptedResponseBuilder reasonPhrase(String reasonPhrase) {
+            this.reasonPhrase = reasonPhrase;
+            return this;
+        }
+
+        public InterceptedResponseBuilder httpVersion(String httpVersion) {
+            this.httpVersion = httpVersion;
+            return this;
+        }
+
+        public InterceptedResponseBuilder httpHeader(HttpHeader header) {
+            this.headers.add(header);
+            return this;
+        }
+
+        public InterceptedResponseBuilder httpHeaders(List<? extends HttpHeader> headers) {
+            this.headers.addAll(headers);
+            return this;
+        }
+
+        public InterceptedResponseBuilder headers(List<HttpHeader> headers) {
+            this.headers.clear();
+            this.headers.addAll(headers);
+            return this;
+        }
+
+        public InterceptedResponseBuilder bodyOffset(int bodyOffset) {
+            this.bodyOffset = bodyOffset;
+            return this;
+        }
+
+        public InterceptedResponseBuilder body(String body) {
+            this.body = body;
+            return this;
+        }
+
+        public InterceptedResponseBuilder markers(List<Marker> markers) {
+            this.markers = markers;
+            return this;
+        }
+
+        public InterceptedResponseBuilder cookie(Cookie cookie) {
+            if (cookie instanceof MockCookie) {
+                this.cookies.add(cookie);
+            } else {
+                this.cookies.add(new MockCookie(cookie.name(), cookie.value(), cookie.domain(), cookie.path(), cookie.expiration()));
+            }
+            return this;
+        }
+
+        public InterceptedResponseBuilder cookies(List<? extends Cookie> cookies) {
+            for (Cookie cookie : cookies) {
+                cookie(cookie);
+            }
+            return this;
+        }
+
+        public InterceptedResponseBuilder mimeType(MimeType mimeType) {
+            this.mimeType = mimeType;
+            return this;
+        }
+
+        public InterceptedResponseBuilder statedMimeType(MimeType statedMimeType) {
+            this.statedMimeType = statedMimeType;
+            return this;
+        }
+
+        public InterceptedResponseBuilder inferredMimeType(MimeType inferredMimeType) {
+            this.inferredMimeType = inferredMimeType;
+            return this;
+        }
+
+        public InterceptedResponseBuilder pageTitle(String pageTitle) {
+            this.pageTitle = pageTitle;
+            return this;
+        }
+
+        public InterceptedResponseBuilder messageId(int messageId) {
+            this.messageId = messageId;
+            return this;
+        }
+
+        public InterceptedResponseBuilder listenerInterface(String listenerInterface) {
+            this.listenerInterface = listenerInterface;
+            return this;
+        }
+
+        public InterceptedResponseBuilder sourceIpAddress(InetAddress sourceIpAddress) {
+            this.sourceIpAddress = sourceIpAddress;
+            return this;
+        }
+
+        public InterceptedResponseBuilder destinationIpAddress(InetAddress destinationIpAddress) {
+            this.destinationIpAddress = destinationIpAddress;
+            return this;
+        }
+
+        public MockHttpResponse build() {
+            return new MockHttpResponse(
+                    request,
+                    annotations,
+                    statusCode,
+                    reasonPhrase,
+                    httpVersion,
+                    headers.isEmpty() ? null : List.copyOf(headers),
+                    bodyOffset,
+                    body,
+                    markers,
+                    cookies.isEmpty() ? null : List.copyOf(cookies),
+                    mimeType,
+                    statedMimeType,
+                    inferredMimeType,
+                    pageTitle,
                     messageId,
                     listenerInterface,
                     sourceIpAddress,
