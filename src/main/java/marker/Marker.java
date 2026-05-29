@@ -1,4 +1,4 @@
-package m4uz;
+package marker;
 
 import burp.api.montoya.BurpExtension;
 import burp.api.montoya.MontoyaApi;
