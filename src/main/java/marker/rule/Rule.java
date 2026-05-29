@@ -27,6 +27,15 @@ public class Rule<T, M, C> implements Predicate<T> {
         this.negated = negated;
     }
 
+    public static <T, M, C> Rule<T, M, C> of(
+            Operator operator,
+            Function<? super T, M> property,
+            BiFunction<M, C, Boolean> matcher,
+            C condition
+    ) {
+        return new Rule<>(operator, property::apply, matcher, condition);
+    }
+
     public Operator getOperator() {
         return operator;
     }
