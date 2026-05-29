@@ -25,8 +25,14 @@ public final class RequestProperties {
     public static final Function<HttpRequest, String> URL =
             HttpRequest::url;
 
+    public static final Function<HttpRequest, Boolean> IS_IN_SCOPE =
+            HttpRequest::isInScope;
+
     public static final Function<HttpRequest, String> FILE_EXTENSION =
             HttpRequest::fileExtension;
+
+    public static final Function<HttpRequest, Boolean> HAS_PARAMETERS =
+            HttpRequest::hasParameters;
 
     public static final Function<HttpRequest, List<String>> COOKIE_NAMES =
             request -> request.parameters(HttpParameterType.COOKIE).stream()
