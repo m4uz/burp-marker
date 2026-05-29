@@ -9,6 +9,8 @@ public class Marker implements BurpExtension {
     @Override
     public void initialize(MontoyaApi api) {
         api.extension().setName("Marker");
-        api.userInterface().registerSuiteTab("Marker", new JPanel());
+        MarkerPanel markerPanel = new MarkerPanel();
+        api.userInterface().registerSuiteTab("Marker", markerPanel);
+        api.proxy().registerRequestHandler(markerPanel);
     }
 }

@@ -14,6 +14,10 @@ public class RuleSet<T> {
         this.rules.addAll(rules);
     }
 
+    public void clear() {
+        this.rules.clear();
+    }
+
     public boolean evaluate(T object) {
         boolean match = false;
         for (int i = 0; i < this.rules.size(); i++) {
