@@ -9,31 +9,34 @@ public class Rule<T, M, C> implements Predicate<T> {
     private final Function<T, M> extractor;
     private final BiFunction<M, C, Boolean> matcher;
     private final C condition;
-    private final boolean negated;
+    private final RulePolarity polarity;
 
     public Rule(Operator operator, Function<T, M> extractor, BiFunction<M, C, Boolean> matcher, C condition) {
-        this.operator = operator;
-        this.extractor = extractor;
-        this.matcher = matcher;
-        this.condition = condition;
-        this.negated = false;
+        this(operator, extractor, matcher, condition, RulePolarity.MATCH);
     }
 
-    public Rule(Operator operator, Function<T, M> extractor, BiFunction<M, C, Boolean> matcher, C condition, boolean negated) {
+    public Rule(
+            Operator operator,
+            Function<T, M> extractor,
+            BiFunction<M, C, Boolean> matcher,
+            C condition,
+            RulePolarity polarity
+    ) {
         this.operator = operator;
         this.extractor = extractor;
         this.matcher = matcher;
         this.condition = condition;
-        this.negated = negated;
+        this.polarity = polarity;
     }
 
     public static <T, M, C> Rule<T, M, C> of(
             Operator operator,
             Function<? super T, M> property,
             BiFunction<M, C, Boolean> matcher,
-            C condition
+            C condition,
+            RulePolarity polarity
     ) {
-        return new Rule<>(operator, property::apply, matcher, condition);
+        return new Rule<>(operator, property::apply, matcher, condition, polarity);
     }
 
     public Operator getOperator() {
@@ -42,6 +45,7 @@ public class Rule<T, M, C> implements Predicate<T> {
 
     @Override
     public boolean test(T t) {
-        return negated != matcher.apply(extractor.apply(t), condition);
+        boolean matches = matcher.apply(extractor.apply(t), condition);
+        return polarity == RulePolarity.MATCH ? matches : !matches;
     }
 }
