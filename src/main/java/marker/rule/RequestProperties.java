@@ -16,6 +16,9 @@ public final class RequestProperties {
     public static final Function<HttpRequest, String> DOMAIN =
             request -> request.httpService().host();
 
+    public static final Function<HttpRequest, Boolean> IS_SECURE =
+            request -> request.httpService().secure();
+
     public static final Function<HttpRequest, String> METHOD =
             HttpRequest::method;
 
