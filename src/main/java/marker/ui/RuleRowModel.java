@@ -2,12 +2,16 @@ package marker.ui;
 
 import marker.rule.Operator;
 
-public class RequestRuleRowModel {
+public class RuleRowModel<T extends Enum<T> & MatchTypeDescriptor> {
     private boolean enabled = true;
     private Operator operator = Operator.OR;
-    private RequestMatchType matchType = RequestMatchType.DOMAIN;
+    private T matchType;
     private RuleRelationship relationship = RuleRelationship.MATCHES;
     private String condition = "";
+
+    public RuleRowModel(T defaultMatchType) {
+        this.matchType = defaultMatchType;
+    }
 
     public boolean isEnabled() {
         return enabled;
@@ -25,11 +29,11 @@ public class RequestRuleRowModel {
         this.operator = operator;
     }
 
-    public RequestMatchType getMatchType() {
+    public T getMatchType() {
         return matchType;
     }
 
-    public void setMatchType(RequestMatchType matchType) {
+    public void setMatchType(T matchType) {
         this.matchType = matchType;
     }
 
@@ -49,8 +53,8 @@ public class RequestRuleRowModel {
         this.condition = condition;
     }
 
-    public RequestRuleRowModel copy() {
-        RequestRuleRowModel copy = new RequestRuleRowModel();
+    public RuleRowModel<T> copy() {
+        RuleRowModel<T> copy = new RuleRowModel<>(matchType);
         copy.enabled = enabled;
         copy.operator = operator;
         copy.matchType = matchType;

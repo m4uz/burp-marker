@@ -1,37 +1,44 @@
 package marker.ui;
 
+import burp.api.montoya.http.message.MimeType;
 import marker.rule.Operator;
 import net.miginfocom.swing.MigLayout;
 
 import javax.swing.*;
 import java.awt.*;
 
-public final class RequestRuleEditorDialog {
-    private RequestRuleEditorDialog() {
+public final class RuleEditorDialog {
+    private RuleEditorDialog() {
     }
 
-    public static RequestRuleRowModel show(Component parent, RequestRuleRowModel initialRule) {
-        RequestRuleRowModel draft = initialRule == null ? new RequestRuleRowModel() : initialRule;
+    public static <T extends Enum<T> & MatchTypeDescriptor> RuleRowModel<T> show(
+            Component parent,
+            RuleRowModel<T> initialRule,
+            T[] matchTypes
+    ) {
+        RuleRowModel<T> draft = initialRule == null ? new RuleRowModel<>(matchTypes[0]) : initialRule;
 
         JCheckBox enabledBox = new JCheckBox("Enabled", draft.isEnabled());
         JComboBox<Operator> operatorCombo = new JComboBox<>(Operator.values());
         operatorCombo.setSelectedItem(draft.getOperator());
 
-        JComboBox<RequestMatchType> matchTypeCombo = new JComboBox<>(RequestMatchType.values());
+        JComboBox<T> matchTypeCombo = new JComboBox<>(matchTypes);
         matchTypeCombo.setSelectedItem(draft.getMatchType());
 
         JComboBox<RuleRelationship> relationshipCombo = new JComboBox<>();
         JComboBox<String> protocolConditionCombo = new JComboBox<>(new String[]{"HTTP", "HTTPS"});
         JComboBox<String> booleanConditionCombo = new JComboBox<>(new String[]{"Yes", "No"});
+        JComboBox<MimeType> mimeTypeConditionCombo = new JComboBox<>(MimeType.values());
         JTextField textConditionField = new JTextField(draft.getCondition(), 20);
 
         JPanel conditionPanel = new JPanel(new CardLayout());
         conditionPanel.add(textConditionField, ConditionInputMode.TEXT.name());
         conditionPanel.add(protocolConditionCombo, ConditionInputMode.PROTOCOL.name());
         conditionPanel.add(booleanConditionCombo, ConditionInputMode.BOOLEAN.name());
+        conditionPanel.add(mimeTypeConditionCombo, ConditionInputMode.MIME_TYPE.name());
 
         Runnable refreshFormState = () -> {
-            RequestMatchType selectedMatchType = (RequestMatchType) matchTypeCombo.getSelectedItem();
+            T selectedMatchType = (T) matchTypeCombo.getSelectedItem();
             RuleRelationship currentRelationship = (RuleRelationship) relationshipCombo.getSelectedItem();
             DefaultComboBoxModel<RuleRelationship> relationshipModel = new DefaultComboBoxModel<>(
                     selectedMatchType.relationships().toArray(new RuleRelationship[0])
@@ -50,10 +57,12 @@ public final class RequestRuleEditorDialog {
         matchTypeCombo.addActionListener(event -> refreshFormState.run());
         refreshFormState.run();
 
-        if (draft.getMatchType().conditionInputMode() == ConditionInputMode.PROTOCOL) {
-            protocolConditionCombo.setSelectedItem(draft.getCondition().isBlank() ? "HTTPS" : draft.getCondition());
-        } else if (draft.getMatchType().conditionInputMode() == ConditionInputMode.BOOLEAN) {
-            booleanConditionCombo.setSelectedItem(draft.getCondition().isBlank() ? "Yes" : draft.getCondition());
+        switch (draft.getMatchType().conditionInputMode()) {
+            case PROTOCOL -> protocolConditionCombo.setSelectedItem(draft.getCondition().isBlank() ? "HTTPS" : draft.getCondition());
+            case BOOLEAN -> booleanConditionCombo.setSelectedItem(draft.getCondition().isBlank() ? "Yes" : draft.getCondition());
+            case MIME_TYPE -> mimeTypeConditionCombo.setSelectedItem(draft.getCondition().isBlank() ? MimeType.HTML : MimeType.valueOf(draft.getCondition()));
+            case TEXT -> {
+            }
         }
 
         JPanel form = new JPanel(new MigLayout(
@@ -79,15 +88,16 @@ public final class RequestRuleEditorDialog {
             return null;
         }
 
-        RequestRuleRowModel updatedRule = new RequestRuleRowModel();
+        RuleRowModel<T> updatedRule = new RuleRowModel<>((T) matchTypeCombo.getSelectedItem());
         updatedRule.setEnabled(enabledBox.isSelected());
         updatedRule.setOperator((Operator) operatorCombo.getSelectedItem());
-        updatedRule.setMatchType((RequestMatchType) matchTypeCombo.getSelectedItem());
+        updatedRule.setMatchType((T) matchTypeCombo.getSelectedItem());
         updatedRule.setRelationship((RuleRelationship) relationshipCombo.getSelectedItem());
         updatedRule.setCondition(switch (updatedRule.getMatchType().conditionInputMode()) {
             case TEXT -> textConditionField.getText();
             case PROTOCOL -> (String) protocolConditionCombo.getSelectedItem();
             case BOOLEAN -> (String) booleanConditionCombo.getSelectedItem();
+            case MIME_TYPE -> ((MimeType) mimeTypeConditionCombo.getSelectedItem()).name();
         });
 
         return updatedRule;

@@ -4,12 +4,12 @@ import javax.swing.table.AbstractTableModel;
 import java.util.ArrayList;
 import java.util.List;
 
-public class RequestRuleTableModel extends AbstractTableModel {
+public class RuleTableModel<T extends Enum<T> & MatchTypeDescriptor> extends AbstractTableModel {
     private static final String[] COLUMNS = {
             "Enabled", "Operator", "Match type", "Relationship", "Condition"
     };
 
-    private final List<RequestRuleRowModel> rules = new ArrayList<>();
+    private final List<RuleRowModel<T>> rules = new ArrayList<>();
 
     @Override
     public int getRowCount() {
@@ -28,7 +28,7 @@ public class RequestRuleTableModel extends AbstractTableModel {
 
     @Override
     public Object getValueAt(int rowIndex, int columnIndex) {
-        RequestRuleRowModel rule = rules.get(rowIndex);
+        RuleRowModel<T> rule = rules.get(rowIndex);
         return switch (columnIndex) {
             case 0 -> rule.isEnabled() ? "Enabled" : "Disabled";
             case 1 -> rule.getOperator();
@@ -39,18 +39,18 @@ public class RequestRuleTableModel extends AbstractTableModel {
         };
     }
 
-    public int addRule(RequestRuleRowModel rule) {
+    public int addRule(RuleRowModel<T> rule) {
         rules.add(rule);
         int index = rules.size() - 1;
         fireTableRowsInserted(index, index);
         return index;
     }
 
-    public RequestRuleRowModel getRule(int rowIndex) {
+    public RuleRowModel<T> getRule(int rowIndex) {
         return rules.get(rowIndex);
     }
 
-    public void updateRule(int rowIndex, RequestRuleRowModel updatedRule) {
+    public void updateRule(int rowIndex, RuleRowModel<T> updatedRule) {
         rules.set(rowIndex, updatedRule);
         fireTableRowsUpdated(rowIndex, rowIndex);
     }
@@ -61,12 +61,12 @@ public class RequestRuleTableModel extends AbstractTableModel {
     }
 
     public void moveRule(int fromIndex, int toIndex) {
-        RequestRuleRowModel movedRule = rules.remove(fromIndex);
+        RuleRowModel<T> movedRule = rules.remove(fromIndex);
         rules.add(toIndex, movedRule);
         fireTableDataChanged();
     }
 
-    public List<RequestRuleRowModel> rules() {
+    public List<RuleRowModel<T>> rules() {
         return List.copyOf(rules);
     }
 }

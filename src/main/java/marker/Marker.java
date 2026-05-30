@@ -12,5 +12,6 @@ public class Marker implements BurpExtension {
         MarkerPanel markerPanel = new MarkerPanel();
         api.userInterface().registerSuiteTab("Marker", markerPanel);
         api.proxy().registerRequestHandler(markerPanel);
+        api.proxy().registerResponseHandler(markerPanel);
     }
 }
