@@ -5,6 +5,16 @@ plugins {
 group = "marker"
 version = "0.0-SNAPSHOT"
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+base {
+    archivesName.set("burp-marker")
+}
+
 repositories {
     mavenCentral()
 }
