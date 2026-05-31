@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+githooks_path="$(dirname "$(realpath $0)")/.commitlintrc.json"
+
+npx --no -- commitlint --config "$githooks_path" --edit "$1"
