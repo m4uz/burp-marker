@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "marker"
-version = "0.0-SNAPSHOT"
+version = "0.0.0-SNAPSHOT"
 
 java {
     toolchain {
@@ -39,4 +39,11 @@ tasks.jar {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.register("printJarName") {
+    description = "Print the jar archive file name."
+    doLast {
+        println(tasks.jar.get().archiveFileName.get())
+    }
 }
