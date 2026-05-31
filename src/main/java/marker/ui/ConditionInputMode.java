@@ -4,5 +4,6 @@ public enum ConditionInputMode {
     TEXT,
     BOOLEAN,
     PROTOCOL,
-    MIME_TYPE
+    MIME_TYPE,
+    NUMBER
 }

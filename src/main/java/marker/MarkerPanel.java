@@ -1,29 +1,19 @@
 package marker;
 
 import burp.api.montoya.core.HighlightColor;
-import burp.api.montoya.http.message.MimeType;
 import burp.api.montoya.proxy.http.InterceptedRequest;
 import burp.api.montoya.proxy.http.InterceptedResponse;
-import burp.api.montoya.proxy.http.ProxyRequestHandler;
-import burp.api.montoya.proxy.http.ProxyRequestReceivedAction;
-import burp.api.montoya.proxy.http.ProxyRequestToBeSentAction;
-import burp.api.montoya.proxy.http.ProxyResponseHandler;
-import burp.api.montoya.proxy.http.ProxyResponseReceivedAction;
-import burp.api.montoya.proxy.http.ProxyResponseToBeSentAction;
 import marker.rule.HighlightRuleSet;
-import marker.rule.Matchers;
-import marker.rule.RequestProperties;
-import marker.rule.ResponseProperties;
+import marker.rule.RequestRuleMapper;
+import marker.rule.ResponseRuleMapper;
 import marker.rule.Rule;
-import marker.rule.RulePolarity;
 import marker.ui.HighlightColorRenderer;
 import marker.ui.MatchTypeDescriptor;
 import marker.ui.RequestMatchType;
 import marker.ui.ResponseMatchType;
 import marker.ui.RuleEditorDialog;
-import marker.ui.RuleRelationship;
 import marker.ui.RuleRowModel;
-import marker.ui.RuleSetViewModel;
+import marker.ui.RuleSetEditorModel;
 import net.miginfocom.swing.MigLayout;
 
 import javax.swing.*;
@@ -34,19 +24,29 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyResponseHandler {
+public class MarkerPanel extends JPanel {
+    private final RequestRuleMapper requestRuleMapper = new RequestRuleMapper();
+    private final ResponseRuleMapper responseRuleMapper = new ResponseRuleMapper();
+
     private JPanel requestRuleSetsPanel;
     private JPanel responseRuleSetsPanel;
 
-    private final List<HighlightRuleSet<InterceptedRequest>> requestRuleSets = new ArrayList<>();
-    private final List<HighlightRuleSet<InterceptedResponse>> responseRuleSets = new ArrayList<>();
+    private final List<RuleSetEditorModel<InterceptedRequest, RequestMatchType>> requestRuleSets = new ArrayList<>();
+    private final List<RuleSetEditorModel<InterceptedResponse, ResponseMatchType>> responseRuleSets = new ArrayList<>();
 
     public MarkerPanel() {
         setupUI();
+    }
+
+    public List<HighlightRuleSet<InterceptedRequest>> requestHighlightRuleSets() {
+        return requestRuleSets.stream().map(RuleSetEditorModel::getRuleSet).toList();
+    }
+
+    public List<HighlightRuleSet<InterceptedResponse>> responseHighlightRuleSets() {
+        return responseRuleSets.stream().map(RuleSetEditorModel::getRuleSet).toList();
     }
 
     private void setupUI() {
@@ -108,13 +108,13 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
     }
 
     private <M, T extends Enum<T> & MatchTypeDescriptor> JComponent buildRuleSetPanel(
-            RuleSetViewModel<M, T> viewModel,
+            RuleSetEditorModel<M, T> editorModel,
             Consumer<JPanel> deleteRuleSetAction,
-            Consumer<RuleSetViewModel<M, T>> addRuleAction,
-            BiConsumer<RuleSetViewModel<M, T>, Integer> editRuleAction,
-            BiConsumer<RuleSetViewModel<M, T>, Integer> removeRuleAction,
-            BiConsumer<RuleSetViewModel<M, T>, Integer> moveUpAction,
-            BiConsumer<RuleSetViewModel<M, T>, Integer> moveDownAction
+            Consumer<RuleSetEditorModel<M, T>> addRuleAction,
+            BiConsumer<RuleSetEditorModel<M, T>, Integer> editRuleAction,
+            BiConsumer<RuleSetEditorModel<M, T>, Integer> removeRuleAction,
+            BiConsumer<RuleSetEditorModel<M, T>, Integer> moveUpAction,
+            BiConsumer<RuleSetEditorModel<M, T>, Integer> moveDownAction
     ) {
         JPanel panel = new JPanel(new MigLayout(
                 "fillx, insets 0, wrap 2, gapx 16, gapy 10",
@@ -127,12 +127,12 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
                 new EmptyBorder(16, 0, 0, 0)
         ));
 
-        JTable rulesTable = new JTable(viewModel.getTableModel());
+        JTable rulesTable = new JTable(editorModel.getTableModel());
         configureRulesTable(rulesTable);
 
-        JComponent metaPanel = buildRuleSetMetaPanel(viewModel.getRuleSetModel(), panel, deleteRuleSetAction);
+        JComponent metaPanel = buildRuleSetMetaPanel(editorModel.getRuleSet(), panel, deleteRuleSetAction);
         JComponent actionsPanel = buildRuleActionsPanel(
-                viewModel,
+                editorModel,
                 rulesTable,
                 addRuleAction,
                 editRuleAction,
@@ -151,7 +151,7 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
     }
 
     private <M> JComponent buildRuleSetMetaPanel(
-            HighlightRuleSet<M> ruleSetModel,
+            HighlightRuleSet<M> ruleSet,
             JPanel ruleSetPanel,
             Consumer<JPanel> deleteRuleSetAction
     ) {
@@ -161,23 +161,23 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
                 "[]"
         ));
 
-        JCheckBox enabled = new JCheckBox("Enabled", ruleSetModel.isEnabled());
+        JCheckBox enabled = new JCheckBox("Enabled", ruleSet.isEnabled());
         enabled.setFont(enabled.getFont().deriveFont(Font.BOLD, 13f));
-        updateEnabledPresentation(enabled, ruleSetModel.isEnabled());
+        updateEnabledPresentation(enabled, ruleSet.isEnabled());
         enabled.addActionListener(event -> {
-            ruleSetModel.setEnabled(enabled.isSelected());
+            ruleSet.setEnabled(enabled.isSelected());
             updateEnabledPresentation(enabled, enabled.isSelected());
         });
 
         JLabel colorLabel = new JLabel("Color");
         JComboBox<HighlightColor> colorCombo = new JComboBox<>(HighlightColor.values());
         colorCombo.setRenderer(new HighlightColorRenderer());
-        colorCombo.setSelectedItem(ruleSetModel.getColor());
-        colorCombo.addActionListener(event -> ruleSetModel.setColor((HighlightColor) colorCombo.getSelectedItem()));
+        colorCombo.setSelectedItem(ruleSet.getColor());
+        colorCombo.addActionListener(event -> ruleSet.setColor((HighlightColor) colorCombo.getSelectedItem()));
 
         JLabel commentLabel = new JLabel("Comment");
-        JTextField commentField = new JTextField(ruleSetModel.getComment());
-        bindTextField(commentField, ruleSetModel::setComment);
+        JTextField commentField = new JTextField(ruleSet.getComment());
+        bindTextField(commentField, ruleSet::setComment);
 
         JButton deleteRuleSetButton = new JButton("Delete ruleset");
         deleteRuleSetButton.addActionListener(event -> deleteRuleSetAction.accept(ruleSetPanel));
@@ -194,13 +194,13 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
     }
 
     private <M, T extends Enum<T> & MatchTypeDescriptor> JComponent buildRuleActionsPanel(
-            RuleSetViewModel<M, T> viewModel,
+            RuleSetEditorModel<M, T> editorModel,
             JTable rulesTable,
-            Consumer<RuleSetViewModel<M, T>> addRuleAction,
-            BiConsumer<RuleSetViewModel<M, T>, Integer> editRuleAction,
-            BiConsumer<RuleSetViewModel<M, T>, Integer> removeRuleAction,
-            BiConsumer<RuleSetViewModel<M, T>, Integer> moveUpAction,
-            BiConsumer<RuleSetViewModel<M, T>, Integer> moveDownAction
+            Consumer<RuleSetEditorModel<M, T>> addRuleAction,
+            BiConsumer<RuleSetEditorModel<M, T>, Integer> editRuleAction,
+            BiConsumer<RuleSetEditorModel<M, T>, Integer> removeRuleAction,
+            BiConsumer<RuleSetEditorModel<M, T>, Integer> moveUpAction,
+            BiConsumer<RuleSetEditorModel<M, T>, Integer> moveDownAction
     ) {
         JPanel panel = new JPanel(new MigLayout(
                 "insets 0, wrap 1, gapy 8",
@@ -210,9 +210,10 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
 
         JButton addButton = new JButton("Add");
         addButton.addActionListener(event -> {
-            addRuleAction.accept(viewModel);
-            int newIndex = viewModel.getTableModel().getRowCount() - 1;
-            if (newIndex >= 0) {
+            int previousCount = editorModel.getTableModel().getRowCount();
+            addRuleAction.accept(editorModel);
+            int newIndex = editorModel.getTableModel().getRowCount() - 1;
+            if (editorModel.getTableModel().getRowCount() > previousCount && newIndex >= 0) {
                 rulesTable.getSelectionModel().setSelectionInterval(newIndex, newIndex);
             }
         });
@@ -221,7 +222,7 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
         editButton.addActionListener(event -> {
             int selectedRow = rulesTable.getSelectedRow();
             if (selectedRow >= 0) {
-                editRuleAction.accept(viewModel, selectedRow);
+                editRuleAction.accept(editorModel, selectedRow);
                 rulesTable.getSelectionModel().setSelectionInterval(selectedRow, selectedRow);
             }
         });
@@ -230,9 +231,9 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
         removeButton.addActionListener(event -> {
             int selectedRow = rulesTable.getSelectedRow();
             if (selectedRow >= 0) {
-                removeRuleAction.accept(viewModel, selectedRow);
-                if (viewModel.getTableModel().getRowCount() > 0) {
-                    int selectionIndex = Math.min(selectedRow, viewModel.getTableModel().getRowCount() - 1);
+                removeRuleAction.accept(editorModel, selectedRow);
+                if (editorModel.getTableModel().getRowCount() > 0) {
+                    int selectionIndex = Math.min(selectedRow, editorModel.getTableModel().getRowCount() - 1);
                     rulesTable.getSelectionModel().setSelectionInterval(selectionIndex, selectionIndex);
                 }
             }
@@ -242,7 +243,7 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
         upButton.addActionListener(event -> {
             int selectedRow = rulesTable.getSelectedRow();
             if (selectedRow > 0) {
-                moveUpAction.accept(viewModel, selectedRow);
+                moveUpAction.accept(editorModel, selectedRow);
                 rulesTable.getSelectionModel().setSelectionInterval(selectedRow - 1, selectedRow - 1);
             }
         });
@@ -250,8 +251,8 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
         JButton downButton = new JButton("Down");
         downButton.addActionListener(event -> {
             int selectedRow = rulesTable.getSelectedRow();
-            if (selectedRow >= 0 && selectedRow < viewModel.getTableModel().getRowCount() - 1) {
-                moveDownAction.accept(viewModel, selectedRow);
+            if (selectedRow >= 0 && selectedRow < editorModel.getTableModel().getRowCount() - 1) {
+                moveDownAction.accept(editorModel, selectedRow);
                 rulesTable.getSelectionModel().setSelectionInterval(selectedRow + 1, selectedRow + 1);
             }
         });
@@ -283,12 +284,11 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
             return;
         }
 
-        HighlightRuleSet<InterceptedRequest> ruleSetModel = new HighlightRuleSet<>();
-        RuleSetViewModel<InterceptedRequest, RequestMatchType> viewModel = new RuleSetViewModel<>(ruleSetModel);
-        requestRuleSets.add(ruleSetModel);
+        RuleSetEditorModel<InterceptedRequest, RequestMatchType> editorModel = new RuleSetEditorModel<>(new HighlightRuleSet<>());
+        requestRuleSets.add(editorModel);
         requestRuleSetsPanel.add(buildRuleSetPanel(
-                viewModel,
-                panel -> removeRequestRuleSet(ruleSetModel, panel),
+                editorModel,
+                panel -> removeRequestRuleSet(editorModel, panel),
                 this::addRequestRule,
                 this::editRequestRule,
                 this::removeRequestRule,
@@ -298,8 +298,8 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
         refreshPanel(requestRuleSetsPanel);
     }
 
-    private void removeRequestRuleSet(HighlightRuleSet<InterceptedRequest> ruleSetModel, JPanel ruleSetPanel) {
-        requestRuleSets.remove(ruleSetModel);
+    private void removeRequestRuleSet(RuleSetEditorModel<InterceptedRequest, RequestMatchType> editorModel, JPanel ruleSetPanel) {
+        requestRuleSets.remove(editorModel);
         requestRuleSetsPanel.remove(ruleSetPanel);
         refreshPanel(requestRuleSetsPanel);
     }
@@ -309,12 +309,11 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
             return;
         }
 
-        HighlightRuleSet<InterceptedResponse> ruleSetModel = new HighlightRuleSet<>();
-        RuleSetViewModel<InterceptedResponse, ResponseMatchType> viewModel = new RuleSetViewModel<>(ruleSetModel);
-        responseRuleSets.add(ruleSetModel);
+        RuleSetEditorModel<InterceptedResponse, ResponseMatchType> editorModel = new RuleSetEditorModel<>(new HighlightRuleSet<>());
+        responseRuleSets.add(editorModel);
         responseRuleSetsPanel.add(buildRuleSetPanel(
-                viewModel,
-                panel -> removeResponseRuleSet(ruleSetModel, panel),
+                editorModel,
+                panel -> removeResponseRuleSet(editorModel, panel),
                 this::addResponseRule,
                 this::editResponseRule,
                 this::removeResponseRule,
@@ -324,8 +323,8 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
         refreshPanel(responseRuleSetsPanel);
     }
 
-    private void removeResponseRuleSet(HighlightRuleSet<InterceptedResponse> ruleSetModel, JPanel ruleSetPanel) {
-        responseRuleSets.remove(ruleSetModel);
+    private void removeResponseRuleSet(RuleSetEditorModel<InterceptedResponse, ResponseMatchType> editorModel, JPanel ruleSetPanel) {
+        responseRuleSets.remove(editorModel);
         responseRuleSetsPanel.remove(ruleSetPanel);
         refreshPanel(responseRuleSetsPanel);
     }
@@ -335,155 +334,88 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
         panel.repaint();
     }
 
-    private void addRequestRule(RuleSetViewModel<InterceptedRequest, RequestMatchType> viewModel) {
+    private void addRequestRule(RuleSetEditorModel<InterceptedRequest, RequestMatchType> editorModel) {
         RuleRowModel<RequestMatchType> createdRule = RuleEditorDialog.show(this, null, RequestMatchType.values());
         if (createdRule != null) {
-            viewModel.getTableModel().addRule(createdRule);
-            syncRequestRuleSet(viewModel);
+            editorModel.getTableModel().addRule(createdRule);
+            syncRequestRuleSet(editorModel);
         }
     }
 
-    private void editRequestRule(RuleSetViewModel<InterceptedRequest, RequestMatchType> viewModel, int selectedRow) {
-        RuleRowModel<RequestMatchType> existingRule = viewModel.getTableModel().getRule(selectedRow);
+    private void editRequestRule(RuleSetEditorModel<InterceptedRequest, RequestMatchType> editorModel, int selectedRow) {
+        RuleRowModel<RequestMatchType> existingRule = editorModel.getTableModel().getRule(selectedRow);
         RuleRowModel<RequestMatchType> editedRule = RuleEditorDialog.show(this, existingRule.copy(), RequestMatchType.values());
         if (editedRule != null) {
-            viewModel.getTableModel().updateRule(selectedRow, editedRule);
-            syncRequestRuleSet(viewModel);
+            editorModel.getTableModel().updateRule(selectedRow, editedRule);
+            syncRequestRuleSet(editorModel);
         }
     }
 
-    private void removeRequestRule(RuleSetViewModel<InterceptedRequest, RequestMatchType> viewModel, int selectedRow) {
-        viewModel.getTableModel().removeRule(selectedRow);
-        syncRequestRuleSet(viewModel);
+    private void removeRequestRule(RuleSetEditorModel<InterceptedRequest, RequestMatchType> editorModel, int selectedRow) {
+        editorModel.getTableModel().removeRule(selectedRow);
+        syncRequestRuleSet(editorModel);
     }
 
-    private void moveRequestRuleUp(RuleSetViewModel<InterceptedRequest, RequestMatchType> viewModel, int selectedRow) {
-        viewModel.getTableModel().moveRule(selectedRow, selectedRow - 1);
-        syncRequestRuleSet(viewModel);
+    private void moveRequestRuleUp(RuleSetEditorModel<InterceptedRequest, RequestMatchType> editorModel, int selectedRow) {
+        editorModel.getTableModel().moveRule(selectedRow, selectedRow - 1);
+        syncRequestRuleSet(editorModel);
     }
 
-    private void moveRequestRuleDown(RuleSetViewModel<InterceptedRequest, RequestMatchType> viewModel, int selectedRow) {
-        viewModel.getTableModel().moveRule(selectedRow, selectedRow + 1);
-        syncRequestRuleSet(viewModel);
+    private void moveRequestRuleDown(RuleSetEditorModel<InterceptedRequest, RequestMatchType> editorModel, int selectedRow) {
+        editorModel.getTableModel().moveRule(selectedRow, selectedRow + 1);
+        syncRequestRuleSet(editorModel);
     }
 
-    private void addResponseRule(RuleSetViewModel<InterceptedResponse, ResponseMatchType> viewModel) {
+    private void addResponseRule(RuleSetEditorModel<InterceptedResponse, ResponseMatchType> editorModel) {
         RuleRowModel<ResponseMatchType> createdRule = RuleEditorDialog.show(this, null, ResponseMatchType.values());
         if (createdRule != null) {
-            viewModel.getTableModel().addRule(createdRule);
-            syncResponseRuleSet(viewModel);
+            editorModel.getTableModel().addRule(createdRule);
+            syncResponseRuleSet(editorModel);
         }
     }
 
-    private void editResponseRule(RuleSetViewModel<InterceptedResponse, ResponseMatchType> viewModel, int selectedRow) {
-        RuleRowModel<ResponseMatchType> existingRule = viewModel.getTableModel().getRule(selectedRow);
+    private void editResponseRule(RuleSetEditorModel<InterceptedResponse, ResponseMatchType> editorModel, int selectedRow) {
+        RuleRowModel<ResponseMatchType> existingRule = editorModel.getTableModel().getRule(selectedRow);
         RuleRowModel<ResponseMatchType> editedRule = RuleEditorDialog.show(this, existingRule.copy(), ResponseMatchType.values());
         if (editedRule != null) {
-            viewModel.getTableModel().updateRule(selectedRow, editedRule);
-            syncResponseRuleSet(viewModel);
+            editorModel.getTableModel().updateRule(selectedRow, editedRule);
+            syncResponseRuleSet(editorModel);
         }
     }
 
-    private void removeResponseRule(RuleSetViewModel<InterceptedResponse, ResponseMatchType> viewModel, int selectedRow) {
-        viewModel.getTableModel().removeRule(selectedRow);
-        syncResponseRuleSet(viewModel);
+    private void removeResponseRule(RuleSetEditorModel<InterceptedResponse, ResponseMatchType> editorModel, int selectedRow) {
+        editorModel.getTableModel().removeRule(selectedRow);
+        syncResponseRuleSet(editorModel);
     }
 
-    private void moveResponseRuleUp(RuleSetViewModel<InterceptedResponse, ResponseMatchType> viewModel, int selectedRow) {
-        viewModel.getTableModel().moveRule(selectedRow, selectedRow - 1);
-        syncResponseRuleSet(viewModel);
+    private void moveResponseRuleUp(RuleSetEditorModel<InterceptedResponse, ResponseMatchType> editorModel, int selectedRow) {
+        editorModel.getTableModel().moveRule(selectedRow, selectedRow - 1);
+        syncResponseRuleSet(editorModel);
     }
 
-    private void moveResponseRuleDown(RuleSetViewModel<InterceptedResponse, ResponseMatchType> viewModel, int selectedRow) {
-        viewModel.getTableModel().moveRule(selectedRow, selectedRow + 1);
-        syncResponseRuleSet(viewModel);
+    private void moveResponseRuleDown(RuleSetEditorModel<InterceptedResponse, ResponseMatchType> editorModel, int selectedRow) {
+        editorModel.getTableModel().moveRule(selectedRow, selectedRow + 1);
+        syncResponseRuleSet(editorModel);
     }
 
-    private void syncRequestRuleSet(RuleSetViewModel<InterceptedRequest, RequestMatchType> viewModel) {
-        viewModel.getRuleSetModel().getRuleSet().clear();
-
-        List<Rule<InterceptedRequest, ?, ?>> rules = viewModel.getTableModel().rules().stream()
-                .filter(RuleRowModel::isEnabled)
-                .map(this::toRequestRule)
-                .toList();
-
-        viewModel.getRuleSetModel().getRuleSet().addAll(rules);
+    private void syncRequestRuleSet(RuleSetEditorModel<InterceptedRequest, RequestMatchType> editorModel) {
+        syncRuleSet(editorModel.getRuleSet(), editorModel.getRules(), requestRuleMapper::toRule);
     }
 
-    private void syncResponseRuleSet(RuleSetViewModel<InterceptedResponse, ResponseMatchType> viewModel) {
-        viewModel.getRuleSetModel().getRuleSet().clear();
-
-        List<Rule<InterceptedResponse, ?, ?>> rules = viewModel.getTableModel().rules().stream()
-                .filter(RuleRowModel::isEnabled)
-                .map(this::toResponseRule)
-                .toList();
-
-        viewModel.getRuleSetModel().getRuleSet().addAll(rules);
+    private void syncResponseRuleSet(RuleSetEditorModel<InterceptedResponse, ResponseMatchType> editorModel) {
+        syncRuleSet(editorModel.getRuleSet(), editorModel.getRules(), responseRuleMapper::toRule);
     }
 
-    private Rule<InterceptedRequest, ?, ?> toRequestRule(RuleRowModel<RequestMatchType> row) {
-        return switch (row.getMatchType()) {
-            case DOMAIN -> buildRule(row, RequestProperties.DOMAIN, Matchers.REGEX, row.getCondition());
-            case PROTOCOL -> buildRule(row, RequestProperties.IS_SECURE, Matchers.BOOLEAN_EQUALS, "HTTPS".equals(row.getCondition()));
-            case METHOD -> buildRule(row, RequestProperties.METHOD, Matchers.REGEX, row.getCondition());
-            case URL -> buildRule(row, RequestProperties.URL, Matchers.REGEX, row.getCondition());
-            case IN_SCOPE -> buildRule(row, RequestProperties.IS_IN_SCOPE, Matchers.BOOLEAN_EQUALS, "Yes".equals(row.getCondition()));
-            case FILE_EXTENSION -> buildRule(row, RequestProperties.FILE_EXTENSION, Matchers.REGEX, row.getCondition());
-            case HAS_PARAMETERS -> buildRule(row, RequestProperties.HAS_PARAMETERS, Matchers.BOOLEAN_EQUALS, "Yes".equals(row.getCondition()));
-            case COOKIE_NAME -> buildRule(row, RequestProperties.COOKIE_NAMES, Matchers.ANY_REGEX, row.getCondition());
-            case COOKIE_VALUE -> buildRule(row, RequestProperties.COOKIE_VALUES, Matchers.ANY_REGEX, row.getCondition());
-            case HEADER_NAME -> buildRule(row, RequestProperties.HEADER_NAMES, Matchers.ANY_REGEX, row.getCondition());
-            case HEADER_VALUE -> buildRule(row, RequestProperties.HEADER_VALUES, Matchers.ANY_REGEX, row.getCondition());
-            case BODY -> buildRule(row, RequestProperties.BODY, Matchers.REGEX, row.getCondition());
-            case PARAMETER_NAME -> buildRule(row, RequestProperties.PARAMETER_NAMES, Matchers.ANY_REGEX, row.getCondition());
-            case PARAMETER_VALUE -> buildRule(row, RequestProperties.PARAMETER_VALUES, Matchers.ANY_REGEX, row.getCondition());
-            case LISTENER_PORT -> buildRule(row, RequestProperties.LISTENER_INTERFACE, Matchers.REGEX, row.getCondition());
-        };
-    }
-
-    private Rule<InterceptedResponse, ?, ?> toResponseRule(RuleRowModel<ResponseMatchType> row) {
-        return switch (row.getMatchType()) {
-            case DOMAIN -> buildRule(row, ResponseProperties.REQUEST_DOMAIN, Matchers.REGEX, row.getCondition());
-            case PROTOCOL -> buildRule(row, ResponseProperties.REQUEST_IS_SECURE, Matchers.BOOLEAN_EQUALS, "HTTPS".equals(row.getCondition()));
-            case METHOD -> buildRule(row, ResponseProperties.REQUEST_METHOD, Matchers.REGEX, row.getCondition());
-            case URL -> buildRule(row, ResponseProperties.REQUEST_URL, Matchers.REGEX, row.getCondition());
-            case IN_SCOPE -> buildRule(row, ResponseProperties.REQUEST_IS_IN_SCOPE, Matchers.BOOLEAN_EQUALS, "Yes".equals(row.getCondition()));
-            case FILE_EXTENSION -> buildRule(row, ResponseProperties.REQUEST_FILE_EXTENSION, Matchers.REGEX, row.getCondition());
-            case HAS_PARAMETERS -> buildRule(row, ResponseProperties.REQUEST_HAS_PARAMETERS, Matchers.BOOLEAN_EQUALS, "Yes".equals(row.getCondition()));
-            case REQUEST_HEADER_NAME -> buildRule(row, ResponseProperties.REQUEST_HEADER_NAMES, Matchers.ANY_REGEX, row.getCondition());
-            case REQUEST_HEADER_VALUE -> buildRule(row, ResponseProperties.REQUEST_HEADER_VALUES, Matchers.ANY_REGEX, row.getCondition());
-            case RESPONSE_COOKIE_NAME -> buildRule(row, ResponseProperties.COOKIE_NAMES, Matchers.ANY_REGEX, row.getCondition());
-            case RESPONSE_COOKIE_VALUE -> buildRule(row, ResponseProperties.COOKIE_VALUES, Matchers.ANY_REGEX, row.getCondition());
-            case RESPONSE_HEADER_NAME -> buildRule(row, ResponseProperties.HEADER_NAMES, Matchers.ANY_REGEX, row.getCondition());
-            case RESPONSE_HEADER_VALUE -> buildRule(row, ResponseProperties.HEADER_VALUES, Matchers.ANY_REGEX, row.getCondition());
-            case RESPONSE_BODY -> buildRule(row, ResponseProperties.BODY, Matchers.REGEX, row.getCondition());
-            case PARAMETER_NAME -> buildRule(row, ResponseProperties.REQUEST_PARAMETER_NAMES, Matchers.ANY_REGEX, row.getCondition());
-            case PARAMETER_VALUE -> buildRule(row, ResponseProperties.REQUEST_PARAMETER_VALUES, Matchers.ANY_REGEX, row.getCondition());
-            case STATUS_CODE -> buildRule(row, ResponseProperties.STATUS_CODE, Matchers.SHORT_EQUALS, parseShortCondition(row.getCondition()));
-            case CONTENT_TYPE -> buildRule(row, ResponseProperties.CONTENT_TYPE, Matchers.REGEX, row.getCondition());
-            case MIME_TYPE -> buildRule(row, ResponseProperties.MIME_TYPE, MimeType::equals, MimeType.valueOf(row.getCondition()));
-            case LISTENER_PORT -> buildRule(row, ResponseProperties.LISTENER_INTERFACE, Matchers.REGEX, row.getCondition());
-        };
-    }
-
-    private <T, X extends Enum<X> & MatchTypeDescriptor, M, C> Rule<T, M, C> buildRule(
-            RuleRowModel<X> row,
-            Function<? super T, M> extractor,
-            BiFunction<M, C, Boolean> matcher,
-            C condition
+    private <M, T extends Enum<T> & MatchTypeDescriptor> void syncRuleSet(
+            HighlightRuleSet<M> ruleSet,
+            List<RuleRowModel<T>> rows,
+            Function<RuleRowModel<T>, Rule<M, ?, ?>> mapper
     ) {
-        return Rule.of(row.getOperator(), extractor, matcher, condition, toRulePolarity(row.getRelationship()));
-    }
-
-    private RulePolarity toRulePolarity(RuleRelationship relationship) {
-        return switch (relationship) {
-            case MATCHES, IS -> RulePolarity.MATCH;
-            case DOES_NOT_MATCH, IS_NOT -> RulePolarity.NOT_MATCH;
-        };
-    }
-
-    private short parseShortCondition(String value) {
-        return Short.parseShort(value.trim());
+        ruleSet.getRuleSet().clear();
+        ruleSet.getRuleSet().addAll(rows.stream()
+                .filter(RuleRowModel::isEnabled)
+                .map(mapper)
+                .toList());
     }
 
     private void updateEnabledPresentation(AbstractButton enabledButton, boolean enabled) {
@@ -508,53 +440,5 @@ public class MarkerPanel extends JPanel implements ProxyRequestHandler, ProxyRes
                 consumer.accept(field.getText());
             }
         });
-    }
-
-    @Override
-    public ProxyRequestReceivedAction handleRequestReceived(InterceptedRequest interceptedRequest) {
-        var annotations = interceptedRequest.annotations();
-
-        for (HighlightRuleSet<InterceptedRequest> ruleSet : requestRuleSets) {
-            if (!ruleSet.isEnabled()) {
-                continue;
-            }
-
-            if (ruleSet.getRuleSet().evaluate(interceptedRequest)) {
-                annotations = annotations
-                        .withHighlightColor(ruleSet.getColor())
-                        .withNotes(ruleSet.getComment());
-            }
-        }
-
-        return ProxyRequestReceivedAction.continueWith(interceptedRequest, annotations);
-    }
-
-    @Override
-    public ProxyRequestToBeSentAction handleRequestToBeSent(InterceptedRequest interceptedRequest) {
-        return ProxyRequestToBeSentAction.continueWith(interceptedRequest);
-    }
-
-    @Override
-    public ProxyResponseReceivedAction handleResponseReceived(InterceptedResponse interceptedResponse) {
-        var annotations = interceptedResponse.annotations();
-
-        for (HighlightRuleSet<InterceptedResponse> ruleSet : responseRuleSets) {
-            if (!ruleSet.isEnabled()) {
-                continue;
-            }
-
-            if (ruleSet.getRuleSet().evaluate(interceptedResponse)) {
-                annotations = annotations
-                        .withHighlightColor(ruleSet.getColor())
-                        .withNotes(ruleSet.getComment());
-            }
-        }
-
-        return ProxyResponseReceivedAction.continueWith(interceptedResponse, annotations);
-    }
-
-    @Override
-    public ProxyResponseToBeSentAction handleResponseToBeSent(InterceptedResponse interceptedResponse) {
-        return ProxyResponseToBeSentAction.continueWith(interceptedResponse);
     }
 }

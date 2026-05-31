@@ -19,7 +19,7 @@ public enum ResponseMatchType implements MatchTypeDescriptor {
     RESPONSE_BODY("Response body", ConditionInputMode.TEXT, List.of(RuleRelationship.MATCHES, RuleRelationship.DOES_NOT_MATCH)),
     PARAMETER_NAME("Parameter name", ConditionInputMode.TEXT, List.of(RuleRelationship.MATCHES, RuleRelationship.DOES_NOT_MATCH)),
     PARAMETER_VALUE("Parameter value", ConditionInputMode.TEXT, List.of(RuleRelationship.MATCHES, RuleRelationship.DOES_NOT_MATCH)),
-    STATUS_CODE("Status code", ConditionInputMode.TEXT, List.of(RuleRelationship.MATCHES, RuleRelationship.DOES_NOT_MATCH)),
+    STATUS_CODE("Status code", ConditionInputMode.NUMBER, List.of(RuleRelationship.MATCHES, RuleRelationship.DOES_NOT_MATCH)),
     CONTENT_TYPE("Content type header", ConditionInputMode.TEXT, List.of(RuleRelationship.MATCHES, RuleRelationship.DOES_NOT_MATCH)),
     MIME_TYPE("MIME type", ConditionInputMode.MIME_TYPE, List.of(RuleRelationship.IS, RuleRelationship.IS_NOT)),
     LISTENER_PORT("Listener port", ConditionInputMode.TEXT, List.of(RuleRelationship.MATCHES, RuleRelationship.DOES_NOT_MATCH));

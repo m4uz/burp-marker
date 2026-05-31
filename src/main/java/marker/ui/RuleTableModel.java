@@ -1,7 +1,6 @@
 package marker.ui;
 
 import javax.swing.table.AbstractTableModel;
-import java.util.ArrayList;
 import java.util.List;
 
 public class RuleTableModel<T extends Enum<T> & MatchTypeDescriptor> extends AbstractTableModel {
@@ -9,7 +8,11 @@ public class RuleTableModel<T extends Enum<T> & MatchTypeDescriptor> extends Abs
             "Enabled", "Operator", "Match type", "Relationship", "Condition"
     };
 
-    private final List<RuleRowModel<T>> rules = new ArrayList<>();
+    private final List<RuleRowModel<T>> rules;
+
+    public RuleTableModel(List<RuleRowModel<T>> rules) {
+        this.rules = rules;
+    }
 
     @Override
     public int getRowCount() {
@@ -64,9 +67,5 @@ public class RuleTableModel<T extends Enum<T> & MatchTypeDescriptor> extends Abs
         RuleRowModel<T> movedRule = rules.remove(fromIndex);
         rules.add(toIndex, movedRule);
         fireTableDataChanged();
-    }
-
-    public List<RuleRowModel<T>> rules() {
-        return List.copyOf(rules);
     }
 }

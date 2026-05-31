@@ -29,6 +29,7 @@ public final class RuleEditorDialog {
         JComboBox<String> protocolConditionCombo = new JComboBox<>(new String[]{"HTTP", "HTTPS"});
         JComboBox<String> booleanConditionCombo = new JComboBox<>(new String[]{"Yes", "No"});
         JComboBox<MimeType> mimeTypeConditionCombo = new JComboBox<>(MimeType.values());
+        JSpinner numberConditionSpinner = new JSpinner(new SpinnerNumberModel(200, 0, 999, 1));
         JTextField textConditionField = new JTextField(draft.getCondition(), 20);
 
         JPanel conditionPanel = new JPanel(new CardLayout());
@@ -36,9 +37,10 @@ public final class RuleEditorDialog {
         conditionPanel.add(protocolConditionCombo, ConditionInputMode.PROTOCOL.name());
         conditionPanel.add(booleanConditionCombo, ConditionInputMode.BOOLEAN.name());
         conditionPanel.add(mimeTypeConditionCombo, ConditionInputMode.MIME_TYPE.name());
+        conditionPanel.add(numberConditionSpinner, ConditionInputMode.NUMBER.name());
 
         Runnable refreshFormState = () -> {
-            T selectedMatchType = (T) matchTypeCombo.getSelectedItem();
+            T selectedMatchType = selectedItem(matchTypeCombo);
             RuleRelationship currentRelationship = (RuleRelationship) relationshipCombo.getSelectedItem();
             DefaultComboBoxModel<RuleRelationship> relationshipModel = new DefaultComboBoxModel<>(
                     selectedMatchType.relationships().toArray(new RuleRelationship[0])
@@ -61,6 +63,7 @@ public final class RuleEditorDialog {
             case PROTOCOL -> protocolConditionCombo.setSelectedItem(draft.getCondition().isBlank() ? "HTTPS" : draft.getCondition());
             case BOOLEAN -> booleanConditionCombo.setSelectedItem(draft.getCondition().isBlank() ? "Yes" : draft.getCondition());
             case MIME_TYPE -> mimeTypeConditionCombo.setSelectedItem(draft.getCondition().isBlank() ? MimeType.HTML : MimeType.valueOf(draft.getCondition()));
+            case NUMBER -> numberConditionSpinner.setValue(draft.getCondition().isBlank() ? 200 : Integer.parseInt(draft.getCondition()));
             case TEXT -> {
             }
         }
@@ -88,19 +91,26 @@ public final class RuleEditorDialog {
             return null;
         }
 
-        RuleRowModel<T> updatedRule = new RuleRowModel<>((T) matchTypeCombo.getSelectedItem());
+        T selectedMatchType = selectedItem(matchTypeCombo);
+        RuleRowModel<T> updatedRule = new RuleRowModel<>(selectedMatchType);
         updatedRule.setEnabled(enabledBox.isSelected());
         updatedRule.setOperator((Operator) operatorCombo.getSelectedItem());
-        updatedRule.setMatchType((T) matchTypeCombo.getSelectedItem());
+        updatedRule.setMatchType(selectedMatchType);
         updatedRule.setRelationship((RuleRelationship) relationshipCombo.getSelectedItem());
         updatedRule.setCondition(switch (updatedRule.getMatchType().conditionInputMode()) {
             case TEXT -> textConditionField.getText();
             case PROTOCOL -> (String) protocolConditionCombo.getSelectedItem();
             case BOOLEAN -> (String) booleanConditionCombo.getSelectedItem();
             case MIME_TYPE -> ((MimeType) mimeTypeConditionCombo.getSelectedItem()).name();
+            case NUMBER -> numberConditionSpinner.getValue().toString();
         });
 
         return updatedRule;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T selectedItem(JComboBox<T> comboBox) {
+        return (T) comboBox.getSelectedItem();
     }
 
     private static void addFormRow(JPanel form, String label, JComponent component) {
