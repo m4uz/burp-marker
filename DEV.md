@@ -72,6 +72,8 @@ Pushing directly to `main` and `develop` is forbidden.
 
 Changes are incorporated via pull requests. Repository branch protection is configured so that pull requests targeting protected branches must be up to date before merging.
 
+Head branches are automatically deleted after pull requests are merged. Therefore, expect feature branches to disappear after merge.
+
 Typical workflow:
 
 ```shell
@@ -137,4 +139,3 @@ git commit -m 'invalid: should be refused by commitlint' --allow-empty
 # ✖   found 1 problems, 0 warnings
 # ⓘ   Get help: https://github.com/conventional-changelog/commitlint/#what-is-commitlint
 ```
-
