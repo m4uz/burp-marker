@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      release: ${{ steps.check.outputs.release }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout
+        # https://github.com/actions/checkout/releases/tag/v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        # https://github.com/actions/setup-node/releases/tag/v6.2.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238
+        with:
+          node-version: "lts/*"
+
+      - name: Install semantic-release
+        run: |
+          npm install --no-save \
+            semantic-release \
+            conventional-changelog-conventionalcommits
+            
+      - name: Run semantic-release (dry-run)
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          cat .releaserc.json
+          
+          OUTPUT="$(npx semantic-release --dry-run)"
+          echo "${OUTPUT}"
+          VERSION="$(echo "$OUTPUT" | grep -im1 "The next release version is" | awk '{print $NF}' || true)"
+          if [ -n "${VERSION}" ]; then
+            echo "Next release: true"
+            echo "Next version: ${VERSION}"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          else
+            echo "Next release: false"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    outputs:
+      jar_name: ${{ steps.build.outputs.jar_name }}
+
+    steps:
+      - name: Setup Java
+        # https://github.com/actions/setup-java/releases/tag/v5.2.0
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Checkout
+        # https://github.com/actions/checkout/releases/tag/v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Build
+        id: build
+        run: |
+          set -euo pipefail
+
+          version="${{ needs.plan.outputs.version }}"
+          sed -i "s/^version = .*/version = \"${version}\"/" build.gradle.kts
+          jar_name="$(./gradlew -q printJarName)"
+          
+          ./gradlew clean build
+          
+          mkdir -p dist
+          cp "build/libs/${jar_name}" "dist/${jar_name}"
+          echo "jar_name=${jar_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifacts
+        # https://github.com/actions/upload-artifact/releases/tag/v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: ${{ steps.build.outputs.jar_name }}
+          path: dist/${{ steps.build.outputs.jar_name }}
+          if-no-files-found: error
+
+  release:
+    needs: [plan, build]
+    if: needs.plan.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        # https://github.com/actions/checkout/releases/tag/v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download build artifacts
+        # https://github.com/actions/download-artifact/releases/tag/v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: ${{ needs.build.outputs.jar_name }}
+          path: dist
+
+      - name: Setup Node.js
+        # https://github.com/actions/setup-node/releases/tag/v6.2.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238
+        with:
+          node-version: "lts/*"
+
+      - name: Install semantic-release
+        run: |
+          npm install --no-save \
+            semantic-release \
+            conventional-changelog-conventionalcommits
+
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release --debug
